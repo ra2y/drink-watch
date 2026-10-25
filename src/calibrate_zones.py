@@ -4,6 +4,7 @@ import json
 
 cap = cv2.VideoCapture(0)
 
+# first 4 clicks is the till, next 4 are the drink area.
 points = []
 
 def mouse_callback(event, x, y, flags, param):
@@ -42,6 +43,7 @@ while True:
         )    
     cv2.imshow("Webcam", frame)
 
+    # q writes the file even if fewer than 8 points were clicked.
     if cv2.waitKey(1) & 0xFF == ord("q"):
         with open("config/zones.json", "w") as file:
             json.dump({"till_zone": points[:4],
