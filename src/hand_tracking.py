@@ -1,7 +1,6 @@
 import cv2
+import time
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 
 # Model Path
 model_path = "./models/hand_landmarker.task"
@@ -25,14 +24,39 @@ options = HandLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
     running_mode=VisionRunningMode.LIVE_STREAM,
     result_callback=print_result,
+    num_hands=100,
 )
 
 # Open webcam
 cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    raise RuntimeError("NO WEBCAM LOL!")
 
 with HandLandmarker.create_from_options(options) as landmarker:
-    # The landmarker is initialized. Use it here.
-    # Convert the frame received from OpenCV to a MediaPipe’s Image object.
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=numpy_frame_from_opencv)
+    while True:
+        success, frame = cap.read()
+        if not success:
+            print("CANT READ FRAME GG FRIKIN EZ!")
+            break
 
-    landmarker.detect_async(mp_image, frame_timestamp_ms)
+        # Convert to RGB
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Create MediaPipe image
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+
+        # Need to know frame timestamps bc frame processing is async
+        frame_timestamp_ms = int(time.monotonic() * 1000)
+
+        # Submit frame asynchronously
+        landmarker.detect_async(mp_image, frame_timestamp_ms)
+
+        # Display Webcam
+        cv2.imshow("Hand Tracking", frame)
+
+        # Press Q to quit
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+cap.release()
+cv2.destroyAllWindows()
