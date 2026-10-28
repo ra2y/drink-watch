@@ -4,3 +4,4 @@ config/*
 .vscode
 !config/.gitkeep
 models/*
+.DS_Store
