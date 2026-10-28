@@ -1,9 +1,16 @@
 import cv2
 import time
 import mediapipe as mp
+import urllib.request
+from pathlib import Path
 
 # Model Path
-model_path = "./models/hand_landmarker.task"
+model_url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+model_path = Path("./models/hand_landmarker.task")
+
+# Download
+if not model_path.exists():
+    urllib.request.urlretrieve(model_url, model_path)
 
 BaseOptions = mp.tasks.BaseOptions
 HandLandmarker = mp.tasks.vision.HandLandmarker
@@ -21,7 +28,7 @@ def print_result(
 
 # MediaPipe Configuration
 options = HandLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path=model_path),
+    base_options=BaseOptions(model_asset_path=str(model_path)),
     running_mode=VisionRunningMode.LIVE_STREAM,
     result_callback=print_result,
     num_hands=100,
@@ -47,6 +54,9 @@ with HandLandmarker.create_from_options(options) as landmarker:
 
         # Need to know frame timestamps bc frame processing is async
         frame_timestamp_ms = int(time.monotonic() * 1000)
+
+        # Draw Hand
+        # mp.tasks.vision.drawing_utils.draw_landmarks()
 
         # Submit frame asynchronously
         landmarker.detect_async(mp_image, frame_timestamp_ms)
