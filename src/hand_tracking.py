@@ -18,21 +18,39 @@ HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
 HandLandmarkerResult = mp.tasks.vision.HandLandmarkerResult
 VisionRunningMode = mp.tasks.vision.RunningMode
 
-
-# Create a hand landmarker instance with the live stream mode:
-def print_result(
-    result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int
-):
-    print("hand landmarker result: {}".format(result))
-
+CONNECTIONS = [
+    (0, 1),  # Thumb
+    (1, 2),  # |
+    (2, 3),  # |
+    (3, 4),  # Thumb
+    (0, 5),  # Index
+    (5, 6),  # |
+    (6, 7),  # |
+    (7, 8),  # Index
+    (5, 9),  # Middle
+    (9, 10),  # |
+    (10, 11), # |
+    (11, 12),  # Middle
+    (9, 13),  # Ring
+    (13, 14), # |
+    (14, 15), # |
+    (15, 16),  # Ring
+    (13, 17),  # Pinky
+    (17, 18),  # |
+    (18, 19),  # |
+    (19, 20),  # Pinky
+    (0, 17),  # Palm
+]
 
 # MediaPipe Configuration
 options = HandLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=str(model_path)),
-    running_mode=VisionRunningMode.LIVE_STREAM,
-    result_callback=print_result,
+    running_mode=VisionRunningMode.VIDEO,
+    # result_callback=print_result,
     num_hands=100,
 )
+
+timpestamp_ms = 0
 
 # Open webcam
 cap = cv2.VideoCapture(0)
@@ -40,27 +58,73 @@ if not cap.isOpened():
     raise RuntimeError("NO WEBCAM LOL!")
 
 with HandLandmarker.create_from_options(options) as landmarker:
-    while True:
+    while cap.isOpened():
         success, frame = cap.read()
         if not success:
             print("CANT READ FRAME GG FRIKIN EZ!")
             break
 
+        # Flip the frame so its like a mirror
+        # frame = cv2.flip(frame, 1)
+
+        height, width, _ = frame.shape
+
         # Convert to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Create MediaPipe image
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+        mp_image = mp.Image(
+            image_format=mp.ImageFormat.SRGB, 
+            data=rgb_frame
+        )
 
-        # Need to know frame timestamps bc frame processing is async
-        frame_timestamp_ms = int(time.monotonic() * 1000)
+        timestamp_ms = int(time.time() * 1000)
 
-        # Draw Hand
-        # mp.tasks.vision.drawing_utils.draw_landmarks()
+        # Submit frame synchronously
+        result = landmarker.detect_for_video(
+            mp_image, 
+            timestamp_ms
+        )
 
-        # Submit frame asynchronously
-        landmarker.detect_async(mp_image, frame_timestamp_ms)
 
+        for hand_index, hand_landmarks in enumerate(result.hand_landmarks):
+            points = []
+            for landmark in hand_landmarks:
+                x = int(landmark.x * width)
+                y = int(landmark.y * height)
+                points.append((x, y))
+                cv2.circle(
+                    frame,
+                    (x, y),
+                    5,
+                    (0, 255, 0),
+                    -1
+                )
+            for start_index, end_index in CONNECTIONS:
+                cv2.line(
+                    frame,
+                    points[start_index],
+                    points[end_index],
+                    (255, 0, 0),
+                    2
+                )
+
+            handedness = result.handedness[hand_index][0]
+            label = f"{handedness.category_name}: {handedness.score:.2f}"
+
+            wrist = hand_landmarks[0]
+            wrist_x = int(wrist.x * width)
+            wrist_y = int(wrist.y * height)
+
+            cv2.putText(
+                frame,
+                label,
+                (wrist_x, wrist_y - 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2
+            )
         # Display Webcam
         cv2.imshow("Hand Tracking", frame)
 
