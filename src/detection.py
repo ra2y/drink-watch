@@ -1,42 +1,28 @@
-import cv2
 from ultralytics import YOLO
 
-# Download YOLO model
-model = YOLO("./models/yolo26n.pt")
 
-# YOLO Object Detection
-results = model.track(
-    source=0, persist=True, tracker="bytetrack.yaml", stream=True, show=False
-)
-
-# Process each frame
-for r in results:
-    # Process detected objects
-    if r.boxes is not None:
-        for box in r.boxes:
-            # Class Info
+def detect_objects(frame, model):
+    # ensure tracking persists
+    result = model.track(frame, persist=True, tracker="bytetrack.yaml", verbose=False)[
+        0
+    ]
+    objects = []
+    
+    # print each detected object's class, confidence, bounds, and tracking ID.
+    if result.boxes is not None:
+        for box in result.boxes:
             class_id = int(box.cls)
             name = model.names[class_id]
-            # Confidence Score
             confidence = float(box.conf)
-            # Coordinates
             x1, y1, x2, y2 = box.xyxy[0].tolist()
-            # Tracking ID
-            if box.id is not None:
-                track_id = int(box.id)
-            else:
-                track_id = None
-            # Print to terminal
+            track_id = int(box.id) if box.id is not None else None
             print(name, confidence, track_id, (x1, y1, x2, y2))
+            objects.append(
+                {"bbox": (x1, y1, x2, y2), "track_id": track_id, "class_id": class_id}
+            )
+    
+    return objects, result.plot()
 
-    # Draw bounding boxes, labels, and tracking information
-    annotated_frame = r.plot()
 
-    # Display annotated video
-    cv2.imshow("YOLO Tracking", annotated_frame)
-
-    # Press Q to quit
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
-
-cv2.destroyAllWindows()
+def create_model():
+    return YOLO("./models/yolo26n.pt")
